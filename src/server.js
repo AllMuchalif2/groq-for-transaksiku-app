@@ -4,8 +4,7 @@ dotenv.config();
 
 const express = require("express");
 const cors = require("cors");
-const { verifyAppSecret } = require("./middleware/authMiddleware");
-const { chatHandler } = require("./handler/chatHandler");
+const routes = require("./routes");
 
 const app = express();
 
@@ -13,8 +12,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Routes
-app.post("/api/chat", verifyAppSecret, chatHandler);
+// Use Routes
+app.use("/api", routes);
 
 // Server startup implementation
 if (require.main === module) {
