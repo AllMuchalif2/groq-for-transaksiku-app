@@ -28,11 +28,34 @@ Mengubah teks bahasa alami menjadi data transaksi terstruktur (JSON).
 
 #### Body Permintaan (Request Body)
 
+> **PENTING**: Request sekarang memerlukan context data dari database lokal Flutter.
+
 ```json
 {
-  "message": "Beli nasi goreng 15rb tadi siang"
+  "message": "Beli nasi goreng 15rb",
+  "kategori": [
+    { "kategori_id": 1, "nama": "Makanan & Minuman", "tipe": "PENGELUARAN" },
+    { "kategori_id": 2, "nama": "Transportasi", "tipe": "PENGELUARAN" },
+    { "kategori_id": 5, "nama": "Gaji", "tipe": "PEMASUKAN" }
+  ],
+  "saldo": [
+    { "saldo_id": 1, "nama": "Dompet Utama" },
+    { "saldo_id": 2, "nama": "GoPay" },
+    { "saldo_id": 3, "nama": "Rekening BCA" }
+  ],
+  "tabungan": [
+    { "tabungan_id": 1, "nama": "Tabungan Liburan" },
+    { "tabungan_id": 2, "nama": "Dana Darurat" }
+  ]
 }
 ```
+
+**Field Descriptions:**
+
+- `message` (required): Teks natural language dari user
+- `kategori` (optional): Array kategori dari database. AI akan memilih `kategori_id` yang paling sesuai
+- `saldo` (optional): Array saldo dari database. AI akan memilih `saldo_id` (default: ID pertama)
+- `tabungan` (optional): Array tabungan dari database. AI akan memilih `tabungan_id` jika disebutkan
 
 #### Respons (Sukses - 200)
 
@@ -42,11 +65,22 @@ Mengubah teks bahasa alami menjadi data transaksi terstruktur (JSON).
   "data": {
     "nama": "Nasi Goreng",
     "jumlah": 15000,
-    "jenis": "pengeluaran",
-    "tanggal": "2024-12-18"
+    "tanggal": "2026-01-04",
+    "kategori_id": 1,
+    "saldo_id": 1,
+    "tabungan_id": null
   }
 }
 ```
+
+**Response Fields:**
+
+- `nama`: Judul transaksi
+- `jumlah`: Nominal dalam IDR (integer)
+- `tanggal`: Tanggal transaksi (ISO8601 format)
+- `kategori_id`: ID kategori yang dipilih AI dari list yang dikirim
+- `saldo_id`: ID saldo yang dipilih AI (default: ID pertama jika tidak disebutkan)
+- `tabungan_id`: ID tabungan jika disebutkan, atau `null`
 
 ---
 
@@ -128,14 +162,24 @@ class GroqService {
         "x-app-secret": appSecret,
       };
 
-  /// Ekstrak data transaksi dari teks
-  static Future<Map<String, dynamic>?> extractTransaction(String text) async {
+  /// Ekstrak data transaksi dari teks dengan context data
+  static Future<Map<String, dynamic>?> extractTransaction(
+    String text, {
+    required List<Map<String, dynamic>> kategori,
+    required List<Map<String, dynamic>> saldo,
+    List<Map<String, dynamic>>? tabungan,
+  }) async {
     final url = Uri.parse("$baseUrl/chat");
     try {
       final response = await http.post(
         url,
         headers: _headers,
-        body: jsonEncode({"message": text}),
+        body: jsonEncode({
+          "message": text,
+          "kategori": kategori,
+          "saldo": saldo,
+          "tabungan": tabungan ?? [],
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -184,10 +228,21 @@ class GroqService {
 
 ```dart
 void testGroq() async {
-  // Tes Ekstraksi
-  final transaction = await GroqService.extractTransaction("Beli bensin 20rb");
+  // Tes Ekstraksi dengan context data
+  final transaction = await GroqService.extractTransaction(
+    "Beli bensin 20rb",
+    kategori: [
+      {"kategori_id": 1, "nama": "Makanan & Minuman", "tipe": "PENGELUARAN"},
+      {"kategori_id": 2, "nama": "Transportasi", "tipe": "PENGELUARAN"},
+    ],
+    saldo: [
+      {"saldo_id": 1, "nama": "Dompet Utama"},
+      {"saldo_id": 2, "nama": "GoPay"},
+    ],
+    tabungan: [],
+  );
   print("Hasil Ekstraksi: $transaction");
-  // Output: {nama: Bensin, jumlah: 20000, jenis: pengeluaran, ...}
+  // Output: {nama: Bensin, jumlah: 20000, kategori_id: 2, saldo_id: 1, tabungan_id: null, ...}
 
   // Tes Insight
   final insight = await GroqService.getFinancialInsight(
