@@ -1,37 +1,27 @@
 const Groq = require("groq-sdk");
-
-// Initialize Groq client
-// Ensure dotenv is loaded in the entry point (server.js), so process.env is available here.
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
-
-// System Prompt Engineering
 const getSystemPrompt = (kategori = [], saldo = [], tabungan = []) => {
   const today = new Date().toISOString().split("T")[0];
-
-  // Format kategori list for prompt
   const kategoriList =
     kategori.length > 0
       ? kategori
           .map((k) => `ID ${k.kategori_id}: ${k.nama} (${k.tipe})`)
           .join(", ")
       : "No categories available";
-
-  // Format saldo list for prompt
   const saldoList =
     saldo.length > 0
       ? saldo.map((s) => `ID ${s.saldo_id}: ${s.nama}`).join(", ")
       : "No balance accounts available";
 
-  // Format tabungan list for prompt
   const tabunganList =
     tabungan.length > 0
       ? tabungan.map((t) => `ID ${t.tabungan_id}: ${t.nama}`).join(", ")
       : "No savings accounts available";
 
   return `
-    You are an intelligent data extraction assistant for an Expense Tracker app called "Transaksiku".
+    You are an intelligent data extraction assistant for an Expense Tracker app called "Saku Cerdas".
     Your task is to extract transaction details from Indonesian natural language text into strict JSON.
 
     Current Date Reference: ${today}
@@ -70,7 +60,6 @@ const chatHandler = async (req, res) => {
         .json({ success: false, message: "Message field is required" });
     }
 
-    // Validate that arrays are actually arrays
     if (
       !Array.isArray(kategori) ||
       !Array.isArray(saldo) ||
@@ -79,9 +68,9 @@ const chatHandler = async (req, res) => {
       return res
         .status(400)
         .json({
-          success: false,
-          message: "kategori, saldo, and tabungan must be arrays",
-        });
+        success: false,
+        message: "kategori, saldo, and tabungan must be arrays",
+      });
     }
 
     const completion = await groq.chat.completions.create({
@@ -89,7 +78,6 @@ const chatHandler = async (req, res) => {
         { role: "system", content: getSystemPrompt(kategori, saldo, tabungan) },
         { role: "user", content: message },
       ],
-      // Using the latest supported model as per previous code
       model: "llama-3.3-70b-versatile",
       temperature: 0.1,
       response_format: { type: "json_object" },
@@ -105,7 +93,6 @@ const chatHandler = async (req, res) => {
     });
   } catch (error) {
     console.error("Groq API Error:", error);
-    // Display clearer error message from Groq if available
     const errorMessage = error?.error?.message || error.message;
     return res.status(500).json({
       success: false,
